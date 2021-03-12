@@ -19,7 +19,7 @@ nvm_install_dir() {
 }
 
 nvm_latest_version() {
-  echo "v0.35.3"
+  echo "v0.37.2"
 }
 
 nvm_profile_is_bash_or_zsh() {
@@ -321,7 +321,7 @@ nvm_do_install() {
   if [ -z "${METHOD}" ]; then
     # Autodetect install method
     if nvm_has git; then
-      install_nvm_from_git
+      install_nvm_as_script
     elif nvm_has nvm_download; then
       install_nvm_as_script
     else
@@ -333,7 +333,7 @@ nvm_do_install() {
       echo >&2 "You need git to install nvm"
       exit 1
     fi
-    install_nvm_from_git
+    install_nvm_as_script
   elif [ "${METHOD}" = 'script' ]; then
     if ! nvm_has nvm_download; then
       echo >&2 "You need curl or wget to install nvm"
