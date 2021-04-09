@@ -223,6 +223,7 @@ nvm_try_profile() {
 # The echo'ed path is guaranteed to be an existing file
 # Otherwise, an empty string is returned
 #
+NVM_PROFILE=()
 nvm_detect_profile() {
   if [ "${PROFILE-}" = '/dev/null' ]; then
     # the user has specifically requested NOT to have nvm touch their profile
@@ -234,31 +235,18 @@ nvm_detect_profile() {
     return
   fi
 
-  local DETECTED_PROFILE
-  DETECTED_PROFILE=''
+  local CHECK
+  CHECK=''
 
-  if [ -n "${BASH_VERSION-}" ]; then
-    if [ -f "$HOME/.bashrc" ]; then
-      DETECTED_PROFILE="$HOME/.bashrc"
-    elif [ -f "$HOME/.bash_profile" ]; then
-      DETECTED_PROFILE="$HOME/.bash_profile"
+
+  for EACH_PROFILE in ".profile" ".bashrc" ".bash_profile" ".zshrc"
+  do
+    if CHECK="$(nvm_try_profile "${HOME}/${EACH_PROFILE}")"; then
+      echo "${HOME}/${EACH_PROFILE}"
+      # echo "$(nvm_try_profile "${HOME}/${EACH_PROFILE}")"
+      NVM_PROFILE+=("${HOME}/${EACH_PROFILE}")
     fi
-  elif [ -n "${ZSH_VERSION-}" ]; then
-    DETECTED_PROFILE="$HOME/.zshrc"
-  fi
-
-  if [ -z "$DETECTED_PROFILE" ]; then
-    for EACH_PROFILE in ".profile" ".bashrc" ".bash_profile" ".zshrc"
-    do
-      if DETECTED_PROFILE="$(nvm_try_profile "${HOME}/${EACH_PROFILE}")"; then
-        break
-      fi
-    done
-  fi
-
-  if [ -n "$DETECTED_PROFILE" ]; then
-    echo "$DETECTED_PROFILE"
-  fi
+  done
 }
 
 #
@@ -350,9 +338,8 @@ nvm_do_install() {
   fi
 
   echo
-
-  local NVM_PROFILE
-  NVM_PROFILE="$(nvm_detect_profile)"
+  
+  # local NVM_PROFILE
   local PROFILE_INSTALL_DIR
   PROFILE_INSTALL_DIR="$(nvm_install_dir | command sed "s:^$HOME:\$HOME:")"
 
@@ -362,40 +349,41 @@ nvm_do_install() {
   COMPLETION_STR='[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion\n'
   BASH_OR_ZSH=false
 
-  if [ -z "${NVM_PROFILE-}" ] ; then
-    local TRIED_PROFILE
-    if [ -n "${PROFILE}" ]; then
-      TRIED_PROFILE="${NVM_PROFILE} (as defined in \$PROFILE), "
-    fi
-    echo "=> Profile not found. Tried ${TRIED_PROFILE-}~/.bashrc, ~/.bash_profile, ~/.zshrc, and ~/.profile."
-    echo "=> Create one of them and run this script again"
-    echo "   OR"
-    echo "=> Append the following lines to the correct file yourself:"
-    command printf "${SOURCE_STR}"
-    echo
-  else
-    if nvm_profile_is_bash_or_zsh "${NVM_PROFILE-}"; then
-      BASH_OR_ZSH=true
-    fi
-    if ! command grep -qc '/nvm.sh' "$NVM_PROFILE"; then
-      echo "=> Appending nvm source string to $NVM_PROFILE"
-      command printf "${SOURCE_STR}" >> "$NVM_PROFILE"
+  for EACH_PROF in "${HOME}/.bash_profile" "${HOME}/.zshrc"; do
+    if [ -z "${EACH_PROF-}" ] ; then
+      local TRIED_PROFILE
+      if [ -n "${PROFILE}" ]; then
+        TRIED_PROFILE="${EACH_PROF} (as defined in \$PROFILE), "
+      fi
+      echo "=> Profile not found. Tried ${TRIED_PROFILE-}~/.bashrc, ~/.bash_profile, ~/.zshrc, and ~/.profile."
+      echo "=> Create one of them and run this script again"
+      echo "   OR"
+      echo "=> Append the following lines to the correct file yourself:"
+      command printf "${SOURCE_STR}"
+      echo
     else
-      echo "=> nvm source string already in ${NVM_PROFILE}"
+      if nvm_profile_is_bash_or_zsh "${EACH_PROF-}"; then
+        BASH_OR_ZSH=true
+      fi
+      if ! command grep -qc '/nvm.sh' "$EACH_PROF"; then
+        echo "=> Appending nvm source string to $EACH_PROF"
+        command printf "${SOURCE_STR}" >> "$EACH_PROF"
+      else
+        echo "=> nvm source string already in ${EACH_PROF}"
+      fi
+      # shellcheck disable=SC2016
+      if ${BASH_OR_ZSH} && ! command grep -qc '$NVM_DIR/bash_completion' "$EACH_PROF"; then
+        echo "=> Appending bash_completion source string to $EACH_PROF"
+        command printf "$COMPLETION_STR" >> "$EACH_PROF"
+      else
+        echo "=> bash_completion source string already in ${EACH_PROF}"
+      fi
     fi
-    # shellcheck disable=SC2016
-    if ${BASH_OR_ZSH} && ! command grep -qc '$NVM_DIR/bash_completion' "$NVM_PROFILE"; then
-      echo "=> Appending bash_completion source string to $NVM_PROFILE"
-      command printf "$COMPLETION_STR" >> "$NVM_PROFILE"
-    else
-      echo "=> bash_completion source string already in ${NVM_PROFILE}"
+    if ${BASH_OR_ZSH} && [ -z "${EACH_PROF-}" ] ; then
+      echo "=> Please also append the following lines to the if you are using bash/zsh shell:"
+      command printf "${EACH_PROF}"
     fi
-  fi
-  if ${BASH_OR_ZSH} && [ -z "${NVM_PROFILE-}" ] ; then
-    echo "=> Please also append the following lines to the if you are using bash/zsh shell:"
-    command printf "${COMPLETION_STR}"
-  fi
-
+  done
   # Source nvm
   # shellcheck source=/dev/null
   \. "$(nvm_install_dir)/nvm.sh"
