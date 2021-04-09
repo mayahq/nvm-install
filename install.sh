@@ -204,6 +204,10 @@ install_nvm_as_script() {
     echo >&2 "Failed to mark '$INSTALL_DIR/nvm-exec' as executable"
     return 3
   }
+  chmod a+x "$INSTALL_DIR/nvm.sh" || {
+    echo >&2 "Failed to mark '$INSTALL_DIR/nvm.sh' as executable"
+    return 3
+  }
 }
 
 nvm_try_profile() {
